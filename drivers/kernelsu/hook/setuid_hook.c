@@ -15,6 +15,7 @@
 #include <linux/uaccess.h>
 #include <linux/uidgid.h>
 #include <linux/version.h>
+#include <linux/workqueue.h> // 手动添加：用于支持工作队列相关宏和结构体
 
 #include "policy/allowlist.h"
 #include "setuid_hook.h"
@@ -46,7 +47,20 @@ static inline bool is_zygote_normal_app_uid(uid_t uid)
 
 extern u32 susfs_zygote_sid;
 extern struct cred *ksu_cred;
+
+/* --- 修复未定义符号错误的核心修改区域 --- */
+// 1. 保留原本的 extern 声明
 extern struct work_struct susfs_extra_works;
+
+// 2. 提供一个空的补偿处理函数，防止执行时发生内核崩溃
+static void dummy_susfs_extra_works_handler(struct work_struct *work)
+{
+    // 这里留空，旧版 SUSFS 不需要处理这个异步任务
+}
+
+// 3. 在此处真正为实体变量分配空间并初始化，彻底喂饱链接器
+struct work_struct susfs_extra_works = __WORK_INITIALIZER(susfs_extra_works, dummy_susfs_extra_works_handler);
+/* -------------------------------------- */
 
 struct susfs_handle_setuid_tw {
     struct callback_head cb;
